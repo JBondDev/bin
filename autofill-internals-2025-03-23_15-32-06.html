@@ -1,0 +1,353 @@
+<html><head>
+<!--
+Copyright 2019 The Chromium Authors
+Use of this source code is governed by a BSD-style license that can be
+found in the LICENSE file.
+-->
+<meta charset="utf-8">
+<script type="module" src="autofill_and_password_manager_internals.js"></script>
+<link rel="stylesheet" href="chrome://resources/css/chrome_shared.css">
+<!--
+  The style sheets are inlined to get a prettier export if the user presses
+  Ctrl/Cmd + S to save the site or presses the download button.
+-->
+<style>
+html {
+  scroll-behavior: smooth;
+}
+
+.sticky-bar {
+  background-color: white;
+  border-bottom: 1px solid black;
+  color: black;
+  overflow: auto;
+  padding-bottom: 1.5ex;
+  position: sticky;
+  top: 0;
+}
+
+#control-panel {
+  display: block;
+  font-size: 120%;
+  line-height: calc(120% + 2ex);
+  padding: 1ex;
+}
+
+#control-panel label {
+  padding-inline-end: 1em;
+  white-space: nowrap;
+}
+
+.fake-button {
+  background-color: lightgray;
+  border: 1px solid black;
+  cursor: pointer;
+  margin-inline-end: 1em;
+  padding: .5ex;
+  white-space: nowrap;
+}
+
+#logging-note {
+  font-style: italic;
+}
+
+#logging-note-incognito {
+  font-style: italic;
+}
+
+/* Initially, nothing is visible, to avoid flicker. */
+#log-entries,
+#logging-note,
+#logging-note-incognito {
+  display: none;
+}
+
+/* Visibility settings for non-Incognito tabs. */
+[data-incognito=false] #log-entries,
+[data-incognito=false] #logging-note {
+  display: block;
+}
+
+/* Visibility settings for Incognito tabs. */
+[data-incognito=true] #logging-note-incognito {
+  display: block;
+}
+
+#version-info {
+  margin: 3px;
+  padding: 3px;
+}
+
+.version {
+  font-family: monospace;
+  max-width: 430px;
+  padding-inline-start: 5px;
+  vertical-align: top;
+  word-break: break-word;
+}
+
+.label {
+  font-family: monospace;
+  font-weight: 200;
+  vertical-align: top;
+}
+
+.log-entry,
+.marker {
+  padding: 3px;
+}
+
+.marker {
+  background-color: red;
+  font-size: 200%;
+  overflow-wrap: break-word;
+  white-space: normal;
+  word-wrap: break-word;
+}
+
+.marker::before {
+  content: 'Position marked: ';
+}
+
+/*
+ * Colors can be taken from
+ * https://material.io/design/color/#tools-for-picking-colors
+ * Pick the rows of entries labeled with 100
+ * Unused colors:
+ * - Light Green #DCEDC8
+ * - Yellow #FFF9C4
+ * - Orange #FFE0B2
+ * - Blue Gray #CFD8DC
+ */
+
+.log-entry[scope='Context'] {
+  background-color: #F5F5F5; /* Gray */
+}
+
+.log-entry[scope='Parsing'] {
+  background-color: #FFECB3; /* Amber */
+}
+
+.log-entry[scope='AbortParsing'] {
+  background-color: #FFCDD2; /* Red */
+}
+
+.log-entry[scope='Filling'] {
+  background-color: #D1C4E9; /* Deep Purple */
+}
+
+.log-entry[scope='Submission'] {
+  background-color: #BBDEFB; /* Blue */
+}
+
+.log-entry[scope='AutofillServer'] {
+  background-color: #D7CCC8; /* Brown */
+}
+
+.log-entry[scope='Metrics'] {
+  background-color: #B2EBF2; /* Cyan */
+}
+
+.log-entry[scope='AddressProfileFormImport'] {
+  background-color: #C8E6C9; /* Green */
+}
+
+.log-entry[scope='CreditCardUploadStatus'] {
+  background-color: #B2DFDB; /* Teal */
+}
+
+.log-entry[scope='CardUploadDecision'] {
+  background-color: #B3E5FC; /* Light Blue */
+}
+
+.log-entry[scope='Rationalization'] {
+  background-color: #F8BBD0; /* Pink */
+}
+
+.log-entry[scope='WebsiteModifiedFieldValue'] {
+  background-color: #FFCCBC; /* Deep Orange */
+}
+
+.log-entry[scope='FastCheckout'] {
+  background-color: #F0F4C3; /* Lime */
+}
+
+.log-entry[scope='TouchToFill'] {
+  background-color: #C5CAE9; /* Indigo */
+}
+
+.log-entry[scope='AutofillAi'] {
+  background-color: #E1BEE7; /* Purple */
+}
+
+/*
+ * Checkboxes add/remove hide-<Scope> classes to the #log-entries. Hiding of the
+ * relevant <div>'s and adjacent <hr>'s is implemented by these classes.
+ */
+
+.hide-Context .log-entry[scope='Context'],
+.hide-Context .log-entry[scope='Context'] + hr {
+  display: none;
+}
+
+.hide-Parsing .log-entry[scope='Parsing'],
+.hide-Parsing .log-entry[scope='Parsing'] + hr {
+  display: none;
+}
+
+.hide-AbortParsing .log-entry[scope='AbortParsing'],
+.hide-AbortParsing .log-entry[scope='AbortParsing'] + hr {
+  display: none;
+}
+
+.hide-Filling .log-entry[scope='Filling'],
+.hide-Filling .log-entry[scope='Filling'] + hr {
+  display: none;
+}
+
+.hide-Submission .log-entry[scope='Submission'],
+.hide-Submission .log-entry[scope='Submission'] + hr {
+  display: none;
+}
+
+.hide-AutofillServer .log-entry[scope='AutofillServer'],
+.hide-AutofillServer .log-entry[scope='AutofillServer'] + hr {
+  display: none;
+}
+
+.hide-Metrics .log-entry[scope='Metrics'],
+.hide-Metrics .log-entry[scope='Metrics'] + hr {
+  display: none;
+}
+
+.hide-AddressProfileFormImport .log-entry[scope='AddressProfileFormImport'],
+.hide-AddressProfileFormImport .log-entry[scope='AddressProfileFormImport'] + hr {
+  display: none;
+}
+
+.hide-CreditCardUploadStatus .log-entry[scope='CreditCardUploadStatus'],
+.hide-CreditCardUploadStatus .log-entry[scope='CreditCardUploadStatus'] + hr {
+  display: none;
+}
+
+.hide-CardUploadDecision .log-entry[scope='CardUploadDecision'],
+.hide-CardUploadDecision .log-entry[scope='CardUploadDecision'] + hr {
+  display: none;
+}
+
+.hide-WebsiteModifiedFieldValue .log-entry[scope=WebsiteModifiedFieldValue],
+.hide-WebsiteModifiedFieldValue .log-entry[scope=WebsiteModifiedFieldValue] + hr {
+  display: none;
+}
+
+.hide-FastCheckout .log-entry[scope=FastCheckout],
+.hide-FastCheckout .log-entry[scope=FastCheckout] + hr {
+  display: none;
+}
+
+.preserve-white-space {
+  white-space: pre-wrap;
+}
+
+.form {
+  border: 1px black solid;
+  margin: 3px;
+  padding: 3px;
+}
+
+.form td {
+  vertical-align: text-top;
+}
+
+.profile_import_from_form_section {
+  border: 1px black solid;
+  margin: 3px;
+  padding: 3px;
+}
+
+.profile_import_from_form_section td {
+  vertical-align: text-top;
+}
+
+.country_data {
+  border: 1px black solid;
+  margin: 3px;
+  padding: 3px;
+}
+
+.country_data td {
+  vertical-align: text-top;
+}
+
+.modal-dialog {
+  background-color: rgb(255, 255, 255);
+  border: 1px solid rgb(0, 0, 0);
+  display: block;
+  height: 100px;
+  left: 10%;
+  overflow: auto;
+  position: fixed;
+  right: 10%;
+  top: 10%;
+  width: 80%;
+  z-index: 1;
+}
+
+.modal-dialog-content {
+  padding: 20px;
+}
+
+.modal-dialog-close-button {
+  bottom: 20px;
+  position: absolute;
+  right: 20px;
+}
+</style>
+<title>Autofill Internals</title></head>
+<body data-incognito="false">
+<div class="sticky-bar">
+  <h1 id="h1-title">Autofill Internals</h1>
+  <div id="control-panel">
+    <div id="scopes-checkbox-placeholder"><label><input type="checkbox" id="Context"> Context</label><label><input type="checkbox" id="Parsing"> Parsing</label><label><input type="checkbox" id="AbortParsing"> AbortParsing</label><label><input type="checkbox" id="Filling"> Filling</label><label><input type="checkbox" id="Submission"> Submission</label><label><input type="checkbox" id="AutofillServer"> AutofillServer</label><label><input type="checkbox" id="Metrics"> Metrics</label><label><input type="checkbox" id="AddressProfileFormImport"> AddressProfileFormImport</label><label><input type="checkbox" id="WebsiteModifiedFieldValue"> WebsiteModifiedFieldValue</label><label><input type="checkbox" id="FastCheckout"> FastCheckout</label><label><input type="checkbox" id="TouchToFill"> TouchToFill</label><label><input type="checkbox" id="AutofillAi"> AutofillAi</label></div>
+    <span id="marker-fake-button" class="fake-button">Add Marker</span>
+    <span id="reset-cache-fake-button" class="fake-button" style="display: inline;">Reset Cache</span>
+    <span id="download-fake-button" class="fake-button">Download Log</span>
+    <span id="download-submitted-forms-json-data-fake-button" class="fake-button" style="display: inline;">Download submitted forms JSON data</span>
+    <div id="settings-checkbox-placeholder"><label><input type="checkbox" id="EnableAutoscroll"> Scroll down</label><label><input type="checkbox" id="CurrentlyRecording"> Record new events</label><label><input type="checkbox" id="AutomaticallyStopRecording"> Stop recording in <span id="stop-recording-time">4:27</span></label><label><input type="checkbox" id="DisplayPii"> Display PII</label></div>
+    <span id="reset-upm-eviction-fake-button" class="fake-button" style="display: none">Reset UPM eviction</span>
+    <span id="reset-account-storage-notice-fake-button" class="fake-button" style="display: none">Reset account storage notice</span>
+  </div>
+</div>
+<div id="logging-note">Captured autofill logs are listed below. Logs are cleared and no longer       captured when all autofill-internals pages are closed.</div>
+<div id="logging-note-incognito">Captured autofill logs are not available in Incognito.</div>
+<div id="version-info">
+  <table>
+    <tbody><tr>
+      <td class="label">Version:</td>
+      <td class="version"><span>134.0.6998.108</span>
+        (<span>official</span>)
+        <span></span></td>
+    </tr>
+    <tr>
+      <td class="label">Revision:</td>
+      <td class="version"><span>9ad0e275c5924667f2bafe7cbfed89075e381af1-refs/branch-heads/6998@{#1971}</span></td>
+    </tr>
+    <tr>
+      <td class="label">User Agent:</td>
+      <td class="version"><span>Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Mobile Safari/537.36</span></td>
+    </tr>
+    <tr>
+      <td class="label">App Locale:</td>
+      <td class="version"><span>en-US</span></td>
+    </tr>
+    <tr>
+      <td class="label">Variations:</td>
+      <td class="version" id="variations-list"><div>e61eae14-377be55a<br>2b978349-ca7d8d80<br>1073a35d-ca7d8d80<br>e1814b25-33c3eba5<br>fd9e245f-7d0a1754<br>87ef25e4-7d0a1754<br>2f6934d6-e8214342<br>34ca1a97-33c3eba5<br>7103530a-ca7d8d80<br>181d9f0c-ca7d8d80<br>89986dbe-ca7d8d80<br>6c1ab71a-ff75f251<br>cae5a6b5-377be55a<br>4583a71-ca7d8d80<br>f69863c5-8d55def<br>d0d3d7ff-c68e72c9<br>f73edf58-ca7d8d80<br>bc06eaa3-ca7d8d80<br>147c5d66-3f4a17df<br>cc96eaac-377be55a<br>83743a2d-ca7d8d80<br>94e21eca-ca7d8d80<br>d8c497dc-ca7d8d80<br>73b87075-cdbea37c<br>dc88470b-377be55a<br>7bd59555-ca7d8d80<br>98e50d92-ca7d8d80<br>6b7d4090-ca7d8d80<br>2dbe7f3c-8834236f<br>6eaf375-ca7d8d80<br>cbc0b4bb-2767ef66<br>95988a12-ca7d8d80<br>1eb32835-ca7d8d80<br>a22d256e-f9a43703<br>c66576a2-b9d928b3<br>bcf6e618-ee9726f7<br>3095aa95-3f4a17df<br>e6c167d9-4ea4dc86<br>4664617a-54fa415c<br>3843461e-377be55a<br>999e8980-142b8fa4<br>7faa7be9-ca7d8d80<br>4505a270-989f556b<br>41e765a5-ecf76f10<br>7840af09-ca7d8d80<br>a5712286-46f012ac<br>85754f87-ca7d8d80<br>691d4256-ca7d8d80<br>f3d990c-377be55a<br>a6c01a0b-377be55a<br>5e4b4ebb-ca7d8d80<br>b617cdf5-ca7d8d80<br>3779be93-ca7d8d80<br>8c6d6f42-ca7d8d80<br>1b5a61aa-ca7d8d80<br>5762377a-377be55a<br>55018e5-4a422d84<br>a582a1b8-5ad3f43d<br>d7ce3099-ca7d8d80<br>bd6dd170-ca7d8d80<br>780df7d2-ca7d8d80<br>55920447-ca7d8d80<br>a05c89eb-ca7d8d80<br>fe949b23-377be55a<br>80bf368c-f9a43703<br>d603785e-ca7d8d80<br>dd2c99d6-ca7d8d80<br>a61cb6b8-4d84c543<br>8f321ce-377be55a<br>4df7655b-ca7d8d80<br>88990ebb-377be55a<br>72f87926-377be55a<br>3c978b59-ca7d8d80<br>9cf6c713-a81f5af8<br>5a24997e-ca7d8d80<br>7feffab5-d1aeef2f<br>ac900222-ca7d8d80<br>95a095bd-ca7d8d80<br>96d006a-ca7d8d80<br>c2d7a2b1-ca7d8d80<br>f42905ff-12ede6a2<br>71c14987-ca7d8d80<br>eebab11d-3fa75b73<br>d46aea39-3fa75b73<br>ae6ad772-9d446b22<br>1fae44a3-cc4e1a9d<br>964c91cb-9d446b22<br>71b3e047-3fa75b73<br>ad9b71e2-ca7d8d80<br>b36d892f-b06ef85f<br>5e3a236d-4113a79e<br>930b1a0-ca7d8d80<br>9e49a863-377be55a<br>53efe597-b20da897<br>13080a68-37b6594d<br>17196951-377be55a<br>f7b9a9e3-ca7d8d80<br>4b82c9ff-ca7d8d80<br>c88fa1e2-ca7d8d80<br>eef5d69a-ca7d8d80<br>fba0616d-ca7d8d80<br>244585ec-ca7d8d80<br>136ff6f9-349b3c71<br>4076100b-ca7d8d80<br>664def95-ca7d8d80<br>778c677c-ca7d8d80<br>7fe519ae-377be55a<br>819163c8-ca7d8d80<br>62e82091-4113a79e<br>55c5338b-377be55a<br>59a12fbe-c486d7d0<br>de028327-ca7d8d80<br>2ca06d17-377be55a<br>3e24459b-377be55a<br>7010c19f-ca7d8d80<br>5bca9eee-2922138c<br>7c0e4650-ca7d8d80<br>66b7a83f-ca7d8d80<br>f3f1bfdb-377be55a<br>d721a76b-ca7d8d80<br>86362250-2922138c<br>4ea303a6-492e1dab<br>f3b6291d-6bb2bb3c<br>f5181214-377be55a<br>3212781a-ca7d8d80<br>393339bd-1bbdce27<br>1edcddf4-f726f89c<br>e32e4a2d-377be55a<br>9a564e2a-ca7d8d80<br>79d7856f-ca7d8d80<br>230c3bc9-c1958267<br>42eac071-377be55a<br>b6f29041-ca7d8d80<br>2bac9a6a-33c3eba5<br>e85106e5-ca7d8d80<br>c046d00b-c8a33f7c<br>3c68162d-377be55a<br>3ced0aa9-ca7d8d80<br>af3bcdf9-ca7d8d80<br>198413d6-377be55a<br>8e8365ea-ca7d8d80<br>6ef0294d-19373ba2<br>52a20523-ca7d8d80<br>d0083347-ca7d8d80<br>c26ea5ae-377be55a<br>5b364a35-ca7d8d80<br>f9675edd-ca7d8d80<br>6f3b1c64-75fcf58a<br>ac8ad2d0-ca7d8d80<br>f98f9dbf-ca7d8d80<br>6174e731-ca7d8d80<br>d01a2361-ca7d8d80<br>30bcdd88-ca7d8d80<br>54c1f277-42091cf6<br>494d8760-52325d43<br>ce44bfdd-f08f240b<br>3ac60855-486e2a9c<br>f48c01d3-6ee583a1<br>63dcb6a3-cdc3d902<br>e706e746-48a2334a<br>f296190c-90ee1655<br>4442aae2-6bdfffe7<br>f690cf64-7158671e<br>ed1d377-e1cc0f14<br>75f0f0a0-6bdfffe7<br>710c3f90-4ad60575<br>e2b18481-5c63917a<br>e7e71889-4ad60575<br>3a8271ac-e9e131c<br>eb37c93a-ca7d8d80<br>bc9a7ea9-ca7d8d80<br>4c3ef716-377be55a<br>92c76c82-ca7d8d80<br>72ee2098-377be55a<br>bdcaab27-377be55a<br>4a86715e-377be55a<br>d89640a1-edd4460a<br>762e8080-277b1d15<br>49171648-3f4a17df<br>797cbb37-ca7d8d80<br>f4f00e05-ca7d8d80<br>9481ce98-3d47f4f4<br>2a426c03-3d47f4f4<br>aca9df2c-3f4a17df<br>a3bc7210-dee66fa8<br>b100ac4-dee66fa8<br>4651ad61-dee66fa8<br>59748665-dee66fa8<br>65250343-dee66fa8<br>553aead6-dee66fa8<br>fe4babb8-dee66fa8<br>6205871c-dee66fa8<br>382b54bb-dee66fa8<br>70678518-dee66fa8<br>be338734-dee66fa8<br>6f316e34-dee66fa8<br>5f9907a9-dee66fa8<br>8eeccb9a-dee66fa8<br>2b465683-dee66fa8<br>52fc7926-1790ff02<br>bc9b361d-dee66fa8<br>a41a7188-dee66fa8<br>ff71bfdc-dee66fa8<br>a6fa7475-dee66fa8<br>92cfa89f-dee66fa8<br>6daa4147-dee66fa8<br>4b935545-bb2d3403<br>9a38bae3-6046c8a7<br>2d1e43a3-3d47f4f4<br>30e58f57-ca7d8d80<br>c4a500a4-3d47f4f4<br>386dc267-3d47f4f4<br>7c9f6a88-3cd1613e<br>11dc0532-7a6abfd6<br>a4406b35-1657e2d6<br>408da146-1657e2d6<br>6c377b0f-a744f381<br>d69d967d-3695c92e<br>d4e26075-49e25a63<br>f598f825-4866ef6e<br>5168dcfa-c04a3c7d<br>f6918184-a714ab2<br>dc20670d-3f4a17df<br></div></td>
+    </tr>
+  </tbody></table>
+</div>
+<div id="log-entries" class="hide-FastCheckout">
+<hr><div class="log-entry" scope="AbortParsing"><div class="log-message" message="AbortParsingNotAllowedScheme">Abort parsing form: Ignoring form because the source url has no allowed scheme<div class="form"><table><tr><td>Form signature:</td><td>5899493227667236456 - 226</td></tr><tr><td>Form alternative signature:</td><td>10771074233982027043 - 308</td></tr><tr><td>Form name:</td><td></td></tr><tr><td>Identifiers: </td><td>renderer id: 0, host frame: 5D1A4F6FE9934339EAD5E2BE20153E80 (chrome://autofill-internals)</td></tr><tr><td>Target URL:</td><td>Invalid URL</td></tr><tr><td>Field 0: </td><td><table><tr><td>Identifiers:</td><td>renderer id: 2, host frame: 5D1A4F6FE9934339EAD5E2BE20153E80 (chrome://autofill-internals), host form renderer id: 0</td></tr><tr><td>Signature:</td><td>1129856487 - 530, host form signature: 5899493227667236456 - 226</td></tr><tr><td>Name:</td><td>Context</td></tr><tr><td>Placeholder:</td><td></td></tr><tr><td>Type:</td><td>UNKNOWN_TYPE (heuristic: UNKNOWN_TYPE, server: pending)</td></tr><tr><td>Section:</td><td>-default</td></tr><tr><td>Label:</td><td>Context</td></tr><tr><td>Is empty:</td><td>No</td></tr><tr><td>Is focusable:</td><td>Yes (focusable)</td></tr><tr><td>Is visible:</td><td>Yes (visible)</td></tr><tr><td>Ranks: </td><td>Field rank: 0, rank in signature group: 0, field rank in host form: 0, rank in host form signature group: 0</td></tr></table></td></tr><tr><td>Field 1: </td><td><table><tr><td>Identifiers:</td><td>renderer id: 5, host frame: 5D1A4F6FE9934339EAD5E2BE20153E80 (chrome://autofill-internals), host form renderer id: 0</td></tr><tr><td>Signature:</td><td>3741373704 - 884, host form signature: 5899493227667236456 - 226</td></tr><tr><td>Name:</td><td>Parsing</td></tr><tr><td>Placeholder:</td><td></td></tr><tr><td>Type:</td><td>UNKNOWN_TYPE (heuristic: UNKNOWN_TYPE, server: pending)</td></tr><tr><td>Section:</td><td>-default</td></tr><tr><td>Label:</td><td>Parsing</td></tr><tr><td>Is empty:</td><td>No</td></tr><tr><td>Is focusable:</td><td>Yes (focusable)</td></tr><tr><td>Is visible:</td><td>Yes (visible)</td></tr><tr><td>Ranks: </td><td>Field rank: 1, rank in signature group: 0, field rank in host form: 1, rank in host form signature group: 0</td></tr></table></td></tr><tr><td>Field 2: </td><td><table><tr><td>Identifiers:</td><td>renderer id: 6, host frame: 5D1A4F6FE9934339EAD5E2BE20153E80 (chrome://autofill-internals), host form renderer id: 0</td></tr><tr><td>Signature:</td><td>187061432 - 959, host form signature: 5899493227667236456 - 226</td></tr><tr><td>Name:</td><td>AbortParsing</td></tr><tr><td>Placeholder:</td><td></td></tr><tr><td>Type:</td><td>UNKNOWN_TYPE (heuristic: UNKNOWN_TYPE, server: pending)</td></tr><tr><td>Section:</td><td>-default</td></tr><tr><td>Label:</td><td>AbortParsing</td></tr><tr><td>Is empty:</td><td>No</td></tr><tr><td>Is focusable:</td><td>Yes (focusable)</td></tr><tr><td>Is visible:</td><td>Yes (visible)</td></tr><tr><td>Ranks: </td><td>Field rank: 2, rank in signature group: 0, field rank in host form: 2, rank in host form signature group: 0</td></tr></table></td></tr><tr><td>Field 3: </td><td><table><tr><td>Identifiers:</td><td>renderer id: 7, host frame: 5D1A4F6FE9934339EAD5E2BE20153E80 (chrome://autofill-internals), host form renderer id: 0</td></tr><tr><td>Signature:</td><td>1890318925 - 727, host form signature: 5899493227667236456 - 226</td></tr><tr><td>Name:</td><td>Filling</td></tr><tr><td>Placeholder:</td><td></td></tr><tr><td>Type:</td><td>UNKNOWN_TYPE (heuristic: UNKNOWN_TYPE, server: pending)</td></tr><tr><td>Section:</td><td>-default</td></tr><tr><td>Label:</td><td>Filling</td></tr><tr><td>Is empty:</td><td>No</td></tr><tr><td>Is focusable:</td><td>Yes (focusable)</td></tr><tr><td>Is visible:</td><td>Yes (visible)</td></tr><tr><td>Ranks: </td><td>Field rank: 3, rank in signature group: 0, field rank in host form: 3, rank in host form signature group: 0</td></tr></table></td></tr><tr><td>Field 4: </td><td><table><tr><td>Identifiers:</td><td>renderer id: 8, host frame: 5D1A4F6FE9934339EAD5E2BE20153E80 (chrome://autofill-internals), host form renderer id: 0</td></tr><tr><td>Signature:</td><td>1044740147 - 876, host form signature: 5899493227667236456 - 226</td></tr><tr><td>Name:</td><td>Submission</td></tr><tr><td>Placeholder:</td><td></td></tr><tr><td>Type:</td><td>UNKNOWN_TYPE (heuristic: UNKNOWN_TYPE, server: pending)</td></tr><tr><td>Section:</td><td>-default</td></tr><tr><td>Label:</td><td>Submission</td></tr><tr><td>Is empty:</td><td>No</td></tr><tr><td>Is focusable:</td><td>Yes (focusable)</td></tr><tr><td>Is visible:</td><td>Yes (visible)</td></tr><tr><td>Ranks: </td><td>Field rank: 4, rank in signature group: 0, field rank in host form: 4, rank in host form signature group: 0</td></tr></table></td></tr><tr><td>Field 5: </td><td><table><tr><td>Identifiers:</td><td>renderer id: 9, host frame: 5D1A4F6FE9934339EAD5E2BE20153E80 (chrome://autofill-internals), host form renderer id: 0</td></tr><tr><td>Signature:</td><td>3774656714 - 315, host form signature: 5899493227667236456 - 226</td></tr><tr><td>Name:</td><td>AutofillServer</td></tr><tr><td>Placeholder:</td><td></td></tr><tr><td>Type:</td><td>UNKNOWN_TYPE (heuristic: UNKNOWN_TYPE, server: pending)</td></tr><tr><td>Section:</td><td>-default</td></tr><tr><td>Label:</td><td>AutofillServer</td></tr><tr><td>Is empty:</td><td>No</td></tr><tr><td>Is focusable:</td><td>Yes (focusable)</td></tr><tr><td>Is visible:</td><td>Yes (visible)</td></tr><tr><td>Ranks: </td><td>Field rank: 5, rank in signature group: 0, field rank in host form: 5, rank in host form signature group: 0</td></tr></table></td></tr><tr><td>Field 6: </td><td><table><tr><td>Identifiers:</td><td>renderer id: 10, host frame: 5D1A4F6FE9934339EAD5E2BE20153E80 (chrome://autofill-internals), host form renderer id: 0</td></tr><tr><td>Signature:</td><td>4176010124 - 667, host form signature: 5899493227667236456 - 226</td></tr><tr><td>Name:</td><td>Metrics</td></tr><tr><td>Placeholder:</td><td></td></tr><tr><td>Type:</td><td>UNKNOWN_TYPE (heuristic: UNKNOWN_TYPE, server: pending)</td></tr><tr><td>Section:</td><td>-default</td></tr><tr><td>Label:</td><td>Metrics</td></tr><tr><td>Is empty:</td><td>No</td></tr><tr><td>Is focusable:</td><td>Yes (focusable)</td></tr><tr><td>Is visible:</td><td>Yes (visible)</td></tr><tr><td>Ranks: </td><td>Field rank: 6, rank in signature group: 0, field rank in host form: 6, rank in host form signature group: 0</td></tr></table></td></tr><tr><td>Field 7: </td><td><table><tr><td>Identifiers:</td><td>renderer id: 11, host frame: 5D1A4F6FE9934339EAD5E2BE20153E80 (chrome://autofill-internals), host form renderer id: 0</td></tr><tr><td>Signature:</td><td>527131822 - 753, host form signature: 5899493227667236456 - 226</td></tr><tr><td>Name:</td><td>AddressProfileFormImport</td></tr><tr><td>Placeholder:</td><td></td></tr><tr><td>Type:</td><td>UNKNOWN_TYPE (heuristic: UNKNOWN_TYPE, server: pending)</td></tr><tr><td>Section:</td><td>-default</td></tr><tr><td>Label:</td><td>AddressProfileFormImport</td></tr><tr><td>Is empty:</td><td>No</td></tr><tr><td>Is focusable:</td><td>Yes (focusable)</td></tr><tr><td>Is visible:</td><td>Yes (visible)</td></tr><tr><td>Ranks: </td><td>Field rank: 7, rank in signature group: 0, field rank in host form: 7, rank in host form signature group: 0</td></tr></table></td></tr><tr><td>Field 8: </td><td><table><tr><td>Identifiers:</td><td>renderer id: 12, host frame: 5D1A4F6FE9934339EAD5E2BE20153E80 (chrome://autofill-internals), host form renderer id: 0</td></tr><tr><td>Signature:</td><td>4130241225 - 135, host form signature: 5899493227667236456 - 226</td></tr><tr><td>Name:</td><td>WebsiteModifiedFieldValue</td></tr><tr><td>Placeholder:</td><td></td></tr><tr><td>Type:</td><td>UNKNOWN_TYPE (heuristic: UNKNOWN_TYPE, server: pending)</td></tr><tr><td>Section:</td><td>-default</td></tr><tr><td>Label:</td><td>WebsiteModifiedFieldValue</td></tr><tr><td>Is empty:</td><td>No</td></tr><tr><td>Is focusable:</td><td>Yes (focusable)</td></tr><tr><td>Is visible:</td><td>Yes (visible)</td></tr><tr><td>Ranks: </td><td>Field rank: 8, rank in signature group: 0, field rank in host form: 8, rank in host form signature group: 0</td></tr></table></td></tr><tr><td>Field 9: </td><td><table><tr><td>Identifiers:</td><td>renderer id: 13, host frame: 5D1A4F6FE9934339EAD5E2BE20153E80 (chrome://autofill-internals), host form renderer id: 0</td></tr><tr><td>Signature:</td><td>2896014881 - 452, host form signature: 5899493227667236456 - 226</td></tr><tr><td>Name:</td><td>FastCheckout</td></tr><tr><td>Placeholder:</td><td></td></tr><tr><td>Type:</td><td>UNKNOWN_TYPE (heuristic: UNKNOWN_TYPE, server: pending)</td></tr><tr><td>Section:</td><td>-default</td></tr><tr><td>Label:</td><td>FastCheckout</td></tr><tr><td>Is empty:</td><td>No</td></tr><tr><td>Is focusable:</td><td>Yes (focusable)</td></tr><tr><td>Is visible:</td><td>Yes (visible)</td></tr><tr><td>Ranks: </td><td>Field rank: 9, rank in signature group: 0, field rank in host form: 9, rank in host form signature group: 0</td></tr></table></td></tr><tr><td>Field 10: </td><td><table><tr><td>Identifiers:</td><td>renderer id: 14, host frame: 5D1A4F6FE9934339EAD5E2BE20153E80 (chrome://autofill-internals), host form renderer id: 0</td></tr><tr><td>Signature:</td><td>2779209143 - 177, host form signature: 5899493227667236456 - 226</td></tr><tr><td>Name:</td><td>TouchToFill</td></tr><tr><td>Placeholder:</td><td></td></tr><tr><td>Type:</td><td>UNKNOWN_TYPE (heuristic: UNKNOWN_TYPE, server: pending)</td></tr><tr><td>Section:</td><td>-default</td></tr><tr><td>Label:</td><td>TouchToFill</td></tr><tr><td>Is empty:</td><td>No</td></tr><tr><td>Is focusable:</td><td>Yes (focusable)</td></tr><tr><td>Is visible:</td><td>Yes (visible)</td></tr><tr><td>Ranks: </td><td>Field rank: 10, rank in signature group: 0, field rank in host form: 10, rank in host form signature group: 0</td></tr></table></td></tr><tr><td>Field 11: </td><td><table><tr><td>Identifiers:</td><td>renderer id: 15, host frame: 5D1A4F6FE9934339EAD5E2BE20153E80 (chrome://autofill-internals), host form renderer id: 0</td></tr><tr><td>Signature:</td><td>1242395945 - 263, host form signature: 5899493227667236456 - 226</td></tr><tr><td>Name:</td><td>AutofillAi</td></tr><tr><td>Placeholder:</td><td></td></tr><tr><td>Type:</td><td>UNKNOWN_TYPE (heuristic: UNKNOWN_TYPE, server: pending)</td></tr><tr><td>Section:</td><td>-default</td></tr><tr><td>Label:</td><td>AutofillAi</td></tr><tr><td>Is empty:</td><td>No</td></tr><tr><td>Is focusable:</td><td>Yes (focusable)</td></tr><tr><td>Is visible:</td><td>Yes (visible)</td></tr><tr><td>Ranks: </td><td>Field rank: 11, rank in signature group: 0, field rank in host form: 11, rank in host form signature group: 0</td></tr></table></td></tr><tr><td>Field 12: </td><td><table><tr><td>Identifiers:</td><td>renderer id: 16, host frame: 5D1A4F6FE9934339EAD5E2BE20153E80 (chrome://autofill-internals), host form renderer id: 0</td></tr><tr><td>Signature:</td><td>1078123514 - 606, host form signature: 5899493227667236456 - 226</td></tr><tr><td>Name:</td><td>EnableAutoscroll</td></tr><tr><td>Placeholder:</td><td></td></tr><tr><td>Type:</td><td>UNKNOWN_TYPE (heuristic: UNKNOWN_TYPE, server: pending)</td></tr><tr><td>Section:</td><td>-default</td></tr><tr><td>Label:</td><td>Scroll down</td></tr><tr><td>Is empty:</td><td>No</td></tr><tr><td>Is focusable:</td><td>Yes (focusable)</td></tr><tr><td>Is visible:</td><td>Yes (visible)</td></tr><tr><td>Ranks: </td><td>Field rank: 12, rank in signature group: 0, field rank in host form: 12, rank in host form signature group: 0</td></tr></table></td></tr><tr><td>Field 13: </td><td><table><tr><td>Identifiers:</td><td>renderer id: 17, host frame: 5D1A4F6FE9934339EAD5E2BE20153E80 (chrome://autofill-internals), host form renderer id: 0</td></tr><tr><td>Signature:</td><td>1446224650 - 612, host form signature: 5899493227667236456 - 226</td></tr><tr><td>Name:</td><td>CurrentlyRecording</td></tr><tr><td>Placeholder:</td><td></td></tr><tr><td>Type:</td><td>UNKNOWN_TYPE (heuristic: UNKNOWN_TYPE, server: pending)</td></tr><tr><td>Section:</td><td>-default</td></tr><tr><td>Label:</td><td>Record new events</td></tr><tr><td>Is empty:</td><td>No</td></tr><tr><td>Is focusable:</td><td>Yes (focusable)</td></tr><tr><td>Is visible:</td><td>Yes (visible)</td></tr><tr><td>Ranks: </td><td>Field rank: 13, rank in signature group: 0, field rank in host form: 13, rank in host form signature group: 0</td></tr></table></td></tr><tr><td>Field 14: </td><td><table><tr><td>Identifiers:</td><td>renderer id: 18, host frame: 5D1A4F6FE9934339EAD5E2BE20153E80 (chrome://autofill-internals), host form renderer id: 0</td></tr><tr><td>Signature:</td><td>670614015 - 795, host form signature: 5899493227667236456 - 226</td></tr><tr><td>Name:</td><td>AutomaticallyStopRecording</td></tr><tr><td>Placeholder:</td><td></td></tr><tr><td>Type:</td><td>UNKNOWN_TYPE (heuristic: UNKNOWN_TYPE, server: pending)</td></tr><tr><td>Section:</td><td>-default</td></tr><tr><td>Label:</td><td>Stop recording in 4:45</td></tr><tr><td>Is empty:</td><td>No</td></tr><tr><td>Is focusable:</td><td>Yes (focusable)</td></tr><tr><td>Is visible:</td><td>Yes (visible)</td></tr><tr><td>Ranks: </td><td>Field rank: 14, rank in signature group: 0, field rank in host form: 14, rank in host form signature group: 0</td></tr></table></td></tr><tr><td>Field 15: </td><td><table><tr><td>Identifiers:</td><td>renderer id: 19, host frame: 5D1A4F6FE9934339EAD5E2BE20153E80 (chrome://autofill-internals), host form renderer id: 0</td></tr><tr><td>Signature:</td><td>3749909528 - 127, host form signature: 5899493227667236456 - 226</td></tr><tr><td>Name:</td><td>DisplayPii</td></tr><tr><td>Placeholder:</td><td></td></tr><tr><td>Type:</td><td>UNKNOWN_TYPE (heuristic: UNKNOWN_TYPE, server: pending)</td></tr><tr><td>Section:</td><td>-default</td></tr><tr><td>Label:</td><td>Display PII</td></tr><tr><td>Is empty:</td><td>No</td></tr><tr><td>Is focusable:</td><td>Yes (focusable)</td></tr><tr><td>Is visible:</td><td>Yes (visible)</td></tr><tr><td>Ranks: </td><td>Field rank: 15, rank in signature group: 0, field rank in host form: 15, rank in host form signature group: 0</td></tr></table></td></tr></table></div></div></div></div>
+
+
+</body></html>
